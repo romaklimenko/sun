@@ -11,3 +11,19 @@ html, body {
 .navbar {
   margin-bottom: 0px;
 }
+
+.informer {
+  padding: 10px;
+}
+
+#paper {
+  border: 1px #e7e7e7 solid;
+  margin: 0px;
+}
+
+.navbar {
+  padding-right: 10px;
+}
+
+footer {
+}
