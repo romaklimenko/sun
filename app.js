@@ -101,8 +101,9 @@ function renderSunriseAndSunset() {
   .attr({fill: "#FF0000", stroke: "#FF0000"});
 }
 
+initializeLocation();
+
 function reset() {
-  initializeLocation();
   initializeDates();
   renderInformers();
   renderPaper();
