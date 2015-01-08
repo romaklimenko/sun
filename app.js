@@ -55,8 +55,11 @@ function renderInformers() {
     Math.abs(Math.round(yesterdayDuration - todayDuration)) + " minutes " +
     ((yesterdayDuration > todayDuration) ? " longer &uarr;" : "shorter &darr;" ));
 
-  $("#today").html(moment(todaySunrise).format("HH:mm") + "&uarr; • Today • " +
-    moment(todaySunset).format("HH:mm") + "&darr;");
+  $("#today").html(
+    "Today, sunrise at " +
+    moment(todaySunrise).format("HH:mm") +
+    " and sunset at " +
+    moment(todaySunset).format("HH:mm"));
 
   $("#tomorrow").html(
     "Tomorrow will be " +
@@ -73,32 +76,67 @@ function renderPaper() {
 }
 
 function renderSunriseAndSunset() {
+
+  function getX(i) {
+    return i * pxPerDay;
+  }
+
+  function getY(date) {
+    return (date.getHours() * 60 + date.getMinutes()) * pxPerMinute;
+  }
+
   var height = $("#paper").height();
   var width = $("#paper").width();
 
-  var pxPerDay = width / dates.length;
+  var pxPerDay = width / (dates.length - 1);
   var pxPerMinute = height / (24 * 60);
 
+  var pathArray = [];
+
   for (var i = 0; i < dates.length; i++) {
+    if (i === 0) {
+      pathArray = pathArray.concat(
+        ["M", getX(i), getY(dates[i]._d.sunrise(latitude, longitude))]);
+    }
+    else {
+      pathArray = pathArray.concat(
+        ["L", getX(i), getY(dates[i]._d.sunrise(latitude, longitude))]);
+    }
+  }
+
+  for (var i = dates.length - 1; i >= 0; i--) {
+    pathArray = pathArray.concat(
+      ["L", getX(i), getY(dates[i]._d.sunset(latitude, longitude))]);
+  }
+
+  pathArray = pathArray.concat(["Z"]);
+
+  var path = paper.path().attr({
+    fill: "#fdf6e3",
+    path: pathArray,
+    stroke: "#657b83"
+  });
+
+  /*for (var i = 0; i < dates.length; i++) {
     var sunrise = dates[i]._d.sunrise(latitude, longitude);
     paper.circle(
-      i * pxPerDay,
-      (sunrise.getHours() * 60 + sunrise.getMinutes()) * pxPerMinute, 1)
-    .attr({fill: "#000000", stroke: "#000000"});
+      getX(i),
+      getY(sunrise), 1)
+    .attr({fill: "#657b83", stroke: "#657b83"});
 
     var sunset = dates[i]._d.sunset(latitude, longitude);
     paper.circle(
-      i * pxPerDay,
-      (sunset.getHours() * 60 + sunset.getMinutes()) * pxPerMinute, 1)
-    .attr({fill: "#000000", stroke: "#000000"});
-  }
+      getX(i),
+      getY(sunset), 1)
+    .attr({fill: "#657b83", stroke: "#657b83"});
+  }*/
 
   // you are here
   var date = new Date();
   paper.circle(
     (moment(date).dayOfYear() - 1) * pxPerDay,
-    (date.getHours() * 60 + date.getMinutes()) * pxPerMinute, 5)
-  .attr({fill: "#FF0000", stroke: "#FF0000"});
+    getY(date), 5)
+  .attr({fill: "#FFFF00", stroke: "#cb4b16"});
 }
 
 initializeLocation();

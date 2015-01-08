@@ -1,6 +1,19 @@
 html, body {
+  background-color: #eee8d5;
+  color: #657b83;
   height: 100%;
   font-family: Verdana;
+}
+
+.navbar {
+  background-color: #002b36;
+  border: none;
+  color: #657b83;
+  margin-bottom: 0px;
+}
+
+header {
+  border-bottom: #fdf6e3 solid 1px;
 }
 
 .fill {
@@ -8,16 +21,13 @@ html, body {
     height: 100%;
 }
 
-.navbar {
-  margin-bottom: 0px;
-}
-
 .informer {
+  background-color: #002b36;
+  color: #fdf6e3;
   padding: 10px;
 }
 
 #paper {
-  border: 1px #e7e7e7 solid;
   margin: 0px;
 }
 
@@ -26,4 +36,10 @@ html, body {
 }
 
 footer {
+}
+
+::selection {
+  background: #FF5E99;
+  color: #fff;
+  text-shadow: none;
 }
