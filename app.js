@@ -7,17 +7,30 @@ var longitude  = 12.5608388;
 var dates;
 var paper;
 
+var address = "";
+
 function initializeLocation() {
 
   function set_location(position) {
     latitude = position.coords.latitude;
     longitude = position.coords.longitude;
+
+    if (address === "") { address = latitude + ", " + longitude };
+
+    $.ajax({
+      url: "https://maps.googleapis.com/maps/api/geocode/json?latlng=" + latitude + "," + longitude
+    }).done(function(result) {
+      address = result.results[0].formatted_address;
+      reset();
+    });
+
+    reset();
   }
 
   if (Modernizr.geolocation) {
     navigator.geolocation.getCurrentPosition(set_location);
   } else {
-    // TODO:
+    alert("Can't get location :(")
   }
 }
 
@@ -56,7 +69,7 @@ function renderInformers() {
     ((yesterdayDuration > todayDuration) ? " longer &uarr;" : "shorter &darr;" ));
 
   $("#today").html(
-    "Today, sunrise at " +
+    "Today, at " + address + ", sunrise at " +
     moment(todaySunrise).format("HH:mm") +
     " and sunset at " +
     moment(todaySunset).format("HH:mm"));
@@ -93,7 +106,20 @@ function renderSunriseAndSunset() {
 
   var pathArray = [];
 
-  var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec"
+  ];
 
   for (var i = 0; i < 24; i++) {
     paper.path(["M", 0, (height / 24) * i, "L", width, (height / 24) * i]).attr({ stroke: "#93a1a1" });
@@ -136,13 +162,14 @@ function renderSunriseAndSunset() {
 
   // you are here
   var date = new Date();
+
+  paper.path(["M", 0, getY(date), "L", width, getY(date)]).attr({ stroke: "#cb4b16" });
+
   paper.circle(
     (moment(date).dayOfYear() - 1) * pxPerDay,
     getY(date), 5)
   .attr({fill: "#FFFF00", stroke: "#cb4b16"});
 }
-
-initializeLocation();
 
 function reset() {
   initializeDates();
@@ -150,6 +177,8 @@ function reset() {
   renderPaper();
   renderSunriseAndSunset();
 }
+
+initializeLocation();
 
 reset();
 
