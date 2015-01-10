@@ -1,5 +1,5 @@
 html, body {
-  background-color: #eee8d5;
+  background-color: #002b36;
   color: #657b83;
   height: 100%;
   font-family: Verdana;
@@ -29,6 +29,7 @@ header {
 
 #paper {
   margin: 0px;
+  background-color: #eee8d5;
 }
 
 .navbar {
@@ -42,4 +43,8 @@ footer {
   background: #FF5E99;
   color: #fff;
   text-shadow: none;
+}
+
+a, a:active, a:visited, a, a:active, a:visited {
+  color: #b58900;
 }

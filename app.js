@@ -93,7 +93,23 @@ function renderSunriseAndSunset() {
 
   var pathArray = [];
 
+  var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  for (var i = 0; i < 24; i++) {
+    paper.path(["M", 0, (height / 24) * i, "L", width, (height / 24) * i]).attr({ stroke: "#93a1a1" });
+    paper.text(15, (height / 24) * i + (height / 48), i + ":00").attr({fill: "#93a1a1"});
+  }
+
+  paper.path(["M", 0, height - 1, "L", width, height - 1]).attr({ stroke: "#93a1a1" });
+
   for (var i = 0; i < dates.length; i++) {
+    if (i !== 0 && dates[i]._d.getDate() === 1) {
+      paper.path(["M", getX(i), 0, "L", getX(i), height]).attr({ stroke: "#93a1a1" });
+    }
+    else if (dates[i]._d.getDate() === 15) {
+      paper.text(getX(i), 10, months[dates[i]._d.getMonth()]).attr({fill: "#93a1a1"});
+    };
+
     if (i === 0) {
       pathArray = pathArray.concat(
         ["M", getX(i), getY(dates[i]._d.sunrise(latitude, longitude))]);
@@ -113,23 +129,10 @@ function renderSunriseAndSunset() {
 
   var path = paper.path().attr({
     fill: "#fdf6e3",
+    "fill-opacity": .5,
     path: pathArray,
     stroke: "#657b83"
   });
-
-  /*for (var i = 0; i < dates.length; i++) {
-    var sunrise = dates[i]._d.sunrise(latitude, longitude);
-    paper.circle(
-      getX(i),
-      getY(sunrise), 1)
-    .attr({fill: "#657b83", stroke: "#657b83"});
-
-    var sunset = dates[i]._d.sunset(latitude, longitude);
-    paper.circle(
-      getX(i),
-      getY(sunset), 1)
-    .attr({fill: "#657b83", stroke: "#657b83"});
-  }*/
 
   // you are here
   var date = new Date();
