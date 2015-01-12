@@ -1,3 +1,4 @@
+/* global alert: true */
 /* global Modernizr: true */
 /* global Raphael: true */
 /* global moment: true */
@@ -6,33 +7,9 @@ var latitude    = 55.6712673;
 var longitude  = 12.5608388;
 var dates;
 var paper;
+var i;
 
 var address = "";
-
-function initializeLocation() {
-
-  function set_location(position) {
-    latitude = position.coords.latitude;
-    longitude = position.coords.longitude;
-
-    if (address === "") { address = latitude + ", " + longitude };
-
-    $.ajax({
-      url: "https://maps.googleapis.com/maps/api/geocode/json?latlng=" + latitude + "," + longitude
-    }).done(function(result) {
-      address = result.results[0].formatted_address;
-      reset();
-    });
-
-    reset();
-  }
-
-  if (Modernizr.geolocation) {
-    navigator.geolocation.getCurrentPosition(set_location);
-  } else {
-    alert("Can't get location :(")
-  }
-}
 
 function initializeDates() {
   var year = new Date().getFullYear();
@@ -42,25 +19,25 @@ function initializeDates() {
 
   dates = [];
 
-  for (var i = 0; i < count; i++) {
+  for (i = 0; i < count; i++) {
     dates.push(moment().startOf("year").add(i, "d"));
   }
 }
 
 function renderInformers() {
-  var yesterday = moment().add(-1, "d");
-  var yesterdaySunrise = yesterday._d.sunrise(latitude, longitude);
-  var yesterdaySunset = yesterday._d.sunset(latitude, longitude);
+  var yesterday = moment().add(-1, "d")._d;
+  var yesterdaySunrise = yesterday.sunrise(latitude, longitude);
+  var yesterdaySunset = yesterday.sunset(latitude, longitude);
   var yesterdayDuration = moment.duration(yesterdaySunset - yesterdaySunrise).asMinutes();
 
-  var today = moment();
-  var todaySunrise = today._d.sunrise(latitude, longitude);
-  var todaySunset = today._d.sunset(latitude, longitude);
+  var today = new Date();
+  var todaySunrise = today.sunrise(latitude, longitude);
+  var todaySunset = today.sunset(latitude, longitude);
   var todayDuration = moment.duration(todaySunset - todaySunrise).asMinutes();
 
-  var tomorrow = moment().add(1, "d");
-  var tomorrowSunrise = tomorrow._d.sunrise(latitude, longitude);
-  var tomorrowSunset = tomorrow._d.sunset(latitude, longitude);
+  var tomorrow = moment().add(1, "d")._d;
+  var tomorrowSunrise = tomorrow.sunrise(latitude, longitude);
+  var tomorrowSunset = tomorrow.sunset(latitude, longitude);
   var tomorrowDuration = moment.duration(tomorrowSunset - tomorrowSunrise).asMinutes();
 
   $("#yesterday").html(
@@ -90,8 +67,8 @@ function renderPaper() {
 
 function renderSunriseAndSunset() {
 
-  function getX(i) {
-    return i * pxPerDay;
+  function getX(dayIndex) {
+    return dayIndex * pxPerDay;
   }
 
   function getY(date) {
@@ -103,72 +80,80 @@ function renderSunriseAndSunset() {
 
   var pxPerDay = width / (dates.length - 1);
   var pxPerMinute = height / (24 * 60);
+  var pxPerHour = height / 24;
 
   var pathArray = [];
 
   var months = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
+    "Jan", "Feb",
+    "Mar", "Apr", "May",
+    "Jun", "Jul", "Aug",
+    "Sep", "Oct", "Nov",
     "Dec"
   ];
 
-  for (var i = 0; i < 24; i++) {
-    paper.path(["M", 0, (height / 24) * i, "L", width, (height / 24) * i]).attr({ stroke: "#93a1a1" });
-    paper.text(15, (height / 24) * i + (height / 48), i + ":00").attr({fill: "#93a1a1"});
+  for (i = 0; i < 24; i++) {
+    paper
+      .path(["M", 0, pxPerHour * i, "L", width, pxPerHour * i])
+      .attr({ stroke: "#93a1a1" });
+
+    paper
+      .text(15, pxPerHour * i + (pxPerHour / 2), i + ":00")
+      .attr({fill: "#93a1a1"});
   }
 
-  paper.path(["M", 0, height - 1, "L", width, height - 1]).attr({ stroke: "#93a1a1" });
+  paper
+    .path(["M", 0, height - 1, "L", width, height - 1])
+    .attr({ stroke: "#93a1a1" });
 
-  for (var i = 0; i < dates.length; i++) {
-    if (i !== 0 && dates[i]._d.getDate() === 1) {
-      paper.path(["M", getX(i), 0, "L", getX(i), height]).attr({ stroke: "#93a1a1" });
+  for (i = 0; i < dates.length; i++) {
+    var date = dates[i]._d;
+
+    if (i !== 0 && date.getDate() === 1) {
+      paper
+        .path(["M", getX(i), 0, "L", getX(i), height])
+        .attr({ stroke: "#93a1a1" });
     }
-    else if (dates[i]._d.getDate() === 15) {
-      paper.text(getX(i), 10, months[dates[i]._d.getMonth()]).attr({fill: "#93a1a1"});
-    };
+    else if (date.getDate() === 15) {
+      paper
+        .text(getX(i), 10, months[date.getMonth()])
+        .attr({fill: "#93a1a1"});
+    }
 
     if (i === 0) {
       pathArray = pathArray.concat(
-        ["M", getX(i), getY(dates[i]._d.sunrise(latitude, longitude))]);
+        ["M", getX(i), getY(date.sunrise(latitude, longitude))]);
     }
     else {
       pathArray = pathArray.concat(
-        ["L", getX(i), getY(dates[i]._d.sunrise(latitude, longitude))]);
+        ["L", getX(i), getY(date.sunrise(latitude, longitude))]);
     }
   }
 
-  for (var i = dates.length - 1; i >= 0; i--) {
+  for (i = dates.length - 1; i >= 0; i--) {
     pathArray = pathArray.concat(
       ["L", getX(i), getY(dates[i]._d.sunset(latitude, longitude))]);
   }
 
   pathArray = pathArray.concat(["Z"]);
 
-  var path = paper.path().attr({
+  paper.path().attr({
     fill: "#fdf6e3",
-    "fill-opacity": .5,
+    "fill-opacity": 0.5,
     path: pathArray,
     stroke: "#657b83"
   });
 
   // you are here
-  var date = new Date();
+  var now = new Date();
 
-  paper.path(["M", 0, getY(date), "L", width, getY(date)]).attr({ stroke: "#cb4b16" });
+  paper
+    .path(["M", 0, getY(now), "L", width, getY(now)])
+    .attr({ stroke: "#cb4b16" });
 
-  paper.circle(
-    (moment(date).dayOfYear() - 1) * pxPerDay,
-    getY(date), 5)
-  .attr({fill: "#FFFF00", stroke: "#cb4b16"});
+  paper
+    .circle((moment(now).dayOfYear() - 1) * pxPerDay, getY(now), 5)
+    .attr({fill: "#FFFF00", stroke: "#cb4b16"});
 }
 
 function reset() {
@@ -176,6 +161,33 @@ function reset() {
   renderInformers();
   renderPaper();
   renderSunriseAndSunset();
+}
+
+function initializeLocation() {
+
+  function set_location(position) {
+    latitude = position.coords.latitude;
+    longitude = position.coords.longitude;
+
+    if (address === "") {
+      address = latitude + ", " + longitude;
+    }
+
+    $.ajax({
+      url: "https://maps.googleapis.com/maps/api/geocode/json?latlng=" + latitude + "," + longitude
+    }).done(function(result) {
+      address = result.results[0].formatted_address;
+      reset();
+    });
+
+    reset();
+  }
+
+  if (Modernizr.geolocation) {
+    navigator.geolocation.getCurrentPosition(set_location);
+  } else {
+    alert("Can't get location :(");
+  }
 }
 
 initializeLocation();
@@ -186,4 +198,4 @@ $(window).resize(function() {
   reset();
 });
 
-setInterval( function() { reset(); }, 60000);
+setInterval( function() { reset(); }, 60000 );
