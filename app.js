@@ -151,8 +151,14 @@ function renderSunriseAndSunset() {
     .path(["M", 0, getY(now), "L", width, getY(now)])
     .attr({ stroke: "#cb4b16" });
 
+  var xNow = (moment(now).dayOfYear() - 1) * pxPerDay;
+
   paper
-    .circle((moment(now).dayOfYear() - 1) * pxPerDay, getY(now), 5)
+    .path(["M", xNow, 0, "L", xNow, height])
+    .attr({ stroke: "#cb4b16" });
+
+  paper
+    .circle(xNow, getY(now), 5)
     .attr({fill: "#FFFF00", stroke: "#cb4b16"});
 }
 
