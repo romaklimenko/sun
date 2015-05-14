@@ -2,7 +2,7 @@ html, body {
   background-color: #002b36;
   color: #657b83;
   height: 100%;
-  font-family: Verdana;
+  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
 }
 
 .navbar {
