@@ -179,13 +179,6 @@ function initializeLocation() {
       address = latitude + ", " + longitude;
     }
 
-    $.ajax({
-      url: "https://maps.googleapis.com/maps/api/geocode/json?latlng=" + latitude + "," + longitude
-    }).done(function(result) {
-      address = result.results[0].formatted_address;
-      reset();
-    });
-
     reset();
   }
 
