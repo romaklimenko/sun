@@ -1,0 +1,213 @@
+/* Solarized color palette */
+:root {
+  --base03: #002b36;
+  --base02: #073642;
+  --base01: #586e75;
+  --base00: #657b83;
+  --base0: #839496;
+  --base1: #93a1a1;
+  --base2: #eee8d5;
+  --base3: #fdf6e3;
+  --yellow: #b58900;
+  --orange: #cb4b16;
+  --red: #dc322f;
+  --magenta: #d33682;
+  --violet: #6c71c4;
+  --blue: #268bd2;
+  --cyan: #2aa198;
+  --green: #859900;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  background-color: var(--base03);
+  color: var(--base00);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header with info panels */
+header {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid var(--base3);
+  flex-shrink: 0;
+}
+
+.info-panel {
+  padding: 12px 16px;
+  text-align: center;
+  color: var(--base3);
+  background-color: var(--base03);
+}
+
+.info-panel:not(:last-child) {
+  border-right: 1px solid var(--base02);
+}
+
+/* Chart container */
+#chart {
+  flex: 1;
+  background-color: var(--base2);
+  overflow: hidden;
+}
+
+/* Location button in header */
+.location-btn {
+  background: none;
+  border: none;
+  color: var(--yellow);
+  cursor: pointer;
+  font-size: inherit;
+  font-family: inherit;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.location-btn:hover {
+  color: var(--orange);
+}
+
+/* Location picker dialog */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+  z-index: 100;
+}
+
+.dialog-backdrop.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.dialog {
+  background-color: var(--base02);
+  border-radius: 8px;
+  padding: 24px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.dialog h2 {
+  color: var(--base3);
+  font-size: 18px;
+  margin-bottom: 16px;
+}
+
+.dialog input[type="text"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--base01);
+  border-radius: 4px;
+  background-color: var(--base03);
+  color: var(--base3);
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.dialog input[type="text"]:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
+.dialog input[type="text"]::placeholder {
+  color: var(--base01);
+}
+
+.dialog-hint {
+  color: var(--base01);
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+
+.dialog-error {
+  color: var(--red);
+  font-size: 12px;
+  min-height: 18px;
+  margin-bottom: 8px;
+}
+
+.dialog-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.btn-primary {
+  background-color: var(--blue);
+  color: var(--base3);
+}
+
+.btn-primary:hover {
+  background-color: var(--cyan);
+}
+
+.btn-secondary {
+  background-color: var(--base01);
+  color: var(--base3);
+}
+
+.btn-secondary:hover {
+  background-color: var(--base00);
+}
+
+.btn-geo {
+  background-color: var(--green);
+  color: var(--base3);
+}
+
+.btn-geo:hover {
+  background-color: var(--cyan);
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  header {
+    grid-template-columns: 1fr;
+  }
+
+  .info-panel:not(:last-child) {
+    border-right: none;
+    border-bottom: 1px solid var(--base02);
+  }
+
+  .dialog {
+    margin: 16px;
+  }
+}
+
+/* Selection colors */
+::selection {
+  background-color: var(--magenta);
+  color: var(--base3);
+}
