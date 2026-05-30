@@ -2,7 +2,7 @@
  * Main application module for sunrise/sunset visualization
  */
 
-import { getSunTimes, getDayLength } from './sun-calc.js';
+import { getSunTimes, getDayLength, getSunCondition } from './sun-calc.js';
 import { SunChart } from './chart.js';
 
 // Default location (Copenhagen)
@@ -21,6 +21,27 @@ function formatTime(date) {
     minute: '2-digit',
     hour12: false
   });
+}
+
+function setTodayText(prefix, locationName, suffix) {
+  const todayEl = document.getElementById('today');
+  todayEl.textContent = prefix;
+
+  const button = document.createElement('button');
+  button.id = 'change-location';
+  button.className = 'location-btn';
+  button.textContent = locationName;
+  button.addEventListener('click', showLocationPicker);
+
+  todayEl.appendChild(button);
+  todayEl.append(suffix);
+}
+
+function describeContinuousSun(date) {
+  const condition = getSunCondition(date, location.lat, location.lon);
+  if (condition === 'always-up') return 'continuous daylight';
+  if (condition === 'always-down') return 'no daylight';
+  return null;
 }
 
 /**
@@ -46,14 +67,21 @@ function updateInfoPanels() {
     const direction = yesterdayLength > todayLength ? 'longer' : 'shorter';
     const arrow = yesterdayLength > todayLength ? '\u2191' : '\u2193';
     yesterdayEl.textContent = `Yesterday was ${diff} minutes ${direction} ${arrow}`;
+  } else {
+    const description = describeContinuousSun(yesterday);
+    yesterdayEl.textContent = description ? `Yesterday had ${description}` : '';
   }
 
   // Today panel
-  const todayEl = document.getElementById('today');
   const locationName = location.name || `${location.lat.toFixed(2)}, ${location.lon.toFixed(2)}`;
   if (sunrise && sunset) {
-    todayEl.innerHTML = `Today at <button id="change-location" class="location-btn">${locationName}</button>, sunrise at ${formatTime(sunrise)} and sunset at ${formatTime(sunset)}`;
-    document.getElementById('change-location').addEventListener('click', showLocationPicker);
+    setTodayText('Today at ', locationName, `, sunrise at ${formatTime(sunrise)} and sunset at ${formatTime(sunset)}`);
+  } else {
+    const condition = getSunCondition(now, location.lat, location.lon);
+    const message = condition === 'always-up'
+      ? ', the sun does not set today'
+      : ', the sun does not rise today';
+    setTodayText('Today at ', locationName, message);
   }
 
   // Tomorrow panel
@@ -63,6 +91,9 @@ function updateInfoPanels() {
     const direction = tomorrowLength > todayLength ? 'longer' : 'shorter';
     const arrow = tomorrowLength > todayLength ? '\u2191' : '\u2193';
     tomorrowEl.textContent = `Tomorrow will be ${diff} minutes ${direction} ${arrow}`;
+  } else {
+    const description = describeContinuousSun(tomorrow);
+    tomorrowEl.textContent = description ? `Tomorrow will have ${description}` : '';
   }
 }
 
@@ -146,11 +177,52 @@ function hideLocationPicker() {
   dialog.classList.remove('visible');
 }
 
+
+function formatLocationResult(result, fallbackName) {
+  if (!result.display_name) return fallbackName;
+  const parts = result.display_name.split(',').map((part) => part.trim()).filter(Boolean);
+  return parts.slice(0, 3).join(', ') || fallbackName;
+}
+
+async function geocodeCityName(cityName) {
+  if (!('fetch' in window)) return null;
+
+  const url = new URL('https://nominatim.openstreetmap.org/search');
+  url.searchParams.set('format', 'jsonv2');
+  url.searchParams.set('limit', '1');
+  url.searchParams.set('addressdetails', '1');
+  url.searchParams.set('q', cityName);
+
+  try {
+    const response = await fetch(url.toString(), {
+      headers: { Accept: 'application/json' }
+    });
+    if (!response.ok) return null;
+
+    const results = await response.json();
+    const result = results[0];
+    if (!result) return null;
+
+    const lat = parseFloat(result.lat);
+    const lon = parseFloat(result.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+    return {
+      lat,
+      lon,
+      name: formatLocationResult(result, cityName)
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
 /**
- * Parse location input (supports "lat, lon" format)
+ * Parse location input (supports "lat, lon" format and city names)
  */
-function parseLocationInput(input) {
+async function parseLocationInput(input) {
   const trimmed = input.trim();
+  if (!trimmed) return null;
 
   // Try to parse as "lat, lon"
   const coordsMatch = trimmed.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
@@ -162,80 +234,37 @@ function parseLocationInput(input) {
     }
   }
 
-  // Try as city name (simple lookup)
-  const cities = {
-    'copenhagen': { lat: 55.6761, lon: 12.5683 },
-    'london': { lat: 51.5074, lon: -0.1278 },
-    'new york': { lat: 40.7128, lon: -74.0060 },
-    'tokyo': { lat: 35.6762, lon: 139.6503 },
-    'sydney': { lat: -33.8688, lon: 151.2093 },
-    'paris': { lat: 48.8566, lon: 2.3522 },
-    'berlin': { lat: 52.5200, lon: 13.4050 },
-    'moscow': { lat: 55.7558, lon: 37.6173 },
-    'oslo': { lat: 59.9139, lon: 10.7522 },
-    'stockholm': { lat: 59.3293, lon: 18.0686 },
-    'helsinki': { lat: 60.1699, lon: 24.9384 },
-    'reykjavik': { lat: 64.1466, lon: -21.9426 },
-    'amsterdam': { lat: 52.3676, lon: 4.9041 },
-    'rome': { lat: 41.9028, lon: 12.4964 },
-    'madrid': { lat: 40.4168, lon: -3.7038 },
-    'lisbon': { lat: 38.7223, lon: -9.1393 },
-    'athens': { lat: 37.9838, lon: 23.7275 },
-    'dubai': { lat: 25.2048, lon: 55.2708 },
-    'singapore': { lat: 1.3521, lon: 103.8198 },
-    'hong kong': { lat: 22.3193, lon: 114.1694 },
-    'los angeles': { lat: 34.0522, lon: -118.2437 },
-    'san francisco': { lat: 37.7749, lon: -122.4194 },
-    'chicago': { lat: 41.8781, lon: -87.6298 },
-    'toronto': { lat: 43.6532, lon: -79.3832 },
-    'vancouver': { lat: 49.2827, lon: -123.1207 },
-    'mexico city': { lat: 19.4326, lon: -99.1332 },
-    'sao paulo': { lat: -23.5505, lon: -46.6333 },
-    'buenos aires': { lat: -34.6037, lon: -58.3816 },
-    'cape town': { lat: -33.9249, lon: 18.4241 },
-    'cairo': { lat: 30.0444, lon: 31.2357 },
-    'mumbai': { lat: 19.0760, lon: 72.8777 },
-    'delhi': { lat: 28.7041, lon: 77.1025 },
-    'bangkok': { lat: 13.7563, lon: 100.5018 },
-    'seoul': { lat: 37.5665, lon: 126.9780 },
-    'beijing': { lat: 39.9042, lon: 116.4074 },
-    'shanghai': { lat: 31.2304, lon: 121.4737 },
-    'melbourne': { lat: -37.8136, lon: 144.9631 },
-    'auckland': { lat: -36.8509, lon: 174.7645 },
-    'dnipro': { lat: 48.4647, lon: 35.0462 },
-    'kyiv': { lat: 50.4501, lon: 30.5234 },
-    'warsaw': { lat: 52.2297, lon: 21.0122 },
-    'prague': { lat: 50.0755, lon: 14.4378 },
-    'vienna': { lat: 48.2082, lon: 16.3738 },
-    'zurich': { lat: 47.3769, lon: 8.5417 },
-    'dublin': { lat: 53.3498, lon: -6.2603 },
-    'edinburgh': { lat: 55.9533, lon: -3.1883 }
-  };
-
-  const cityKey = trimmed.toLowerCase();
-  if (cities[cityKey]) {
-    return { ...cities[cityKey], name: trimmed };
-  }
-
-  return null;
+  // Look up any typed city or place name rather than restricting users to a fixed list.
+  return geocodeCityName(trimmed);
 }
 
 /**
  * Handle location form submission
  */
-function handleLocationSubmit(e) {
+async function handleLocationSubmit(e) {
   e.preventDefault();
   const input = document.getElementById('location-input');
   const errorEl = document.getElementById('location-error');
+  const submitBtn = e.submitter || document.querySelector('#location-form button[type="submit"]');
   const value = input.value;
 
-  const parsed = parseLocationInput(value);
+  errorEl.textContent = '';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Finding location...';
+  }
+
+  const parsed = await parseLocationInput(value);
   if (parsed) {
     setLocation(parsed.lat, parsed.lon, parsed.name || value);
     hideLocationPicker();
-    errorEl.textContent = '';
   } else {
     errorEl.textContent = 'Enter coordinates (e.g., "55.67, 12.56") or a city name';
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Set Location';
   }
 }
 

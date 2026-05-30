@@ -24,6 +24,34 @@ const asinDeg = (x) => Math.asin(x) * 180 / Math.PI;
 const acosDeg = (x) => Math.acos(x) * 180 / Math.PI;
 const mod = (a, b) => ((a % b) + b) % b;
 
+
+function getCosLocalHourAngle(date, latitude, longitude, isSunrise, zenith = 90.8333) {
+  const hoursFromMeridian = longitude / DEGREES_PER_HOUR;
+  const dayOfYear = getDayOfYear(date);
+
+  // Approximate time of event in days
+  const approxTimeOfEventInDays = isSunrise
+    ? dayOfYear + ((6 - hoursFromMeridian) / 24)
+    : dayOfYear + ((18 - hoursFromMeridian) / 24);
+
+  // Sun's mean anomaly
+  const sunMeanAnomaly = (0.9856 * approxTimeOfEventInDays) - 3.289;
+
+  // Sun's true longitude
+  let sunTrueLongitude = sunMeanAnomaly +
+    (1.916 * sinDeg(sunMeanAnomaly)) +
+    (0.020 * sinDeg(2 * sunMeanAnomaly)) +
+    282.634;
+  sunTrueLongitude = mod(sunTrueLongitude, 360);
+
+  // Sun's declination
+  const sinDec = 0.39782 * sinDeg(sunTrueLongitude);
+  const cosDec = cosDeg(asinDeg(sinDec));
+
+  return (cosDeg(zenith) - (sinDec * sinDeg(latitude))) /
+    (cosDec * cosDeg(latitude));
+}
+
 /**
  * Get day of year (1-366)
  * @param {Date} date
@@ -145,6 +173,20 @@ export function getSunTimes(date, latitude, longitude) {
     sunrise: getSunrise(date, latitude, longitude),
     sunset: getSunset(date, latitude, longitude)
   };
+}
+
+/**
+ * Get whether the sun has normal rise/set events, continuous daylight, or no daylight.
+ * @param {Date} date
+ * @param {number} latitude
+ * @param {number} longitude
+ * @returns {'normal'|'always-up'|'always-down'}
+ */
+export function getSunCondition(date, latitude, longitude) {
+  const cosLocalHourAngle = getCosLocalHourAngle(date, latitude, longitude, true);
+  if (cosLocalHourAngle < -1) return 'always-up';
+  if (cosLocalHourAngle > 1) return 'always-down';
+  return 'normal';
 }
 
 /**
