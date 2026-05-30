@@ -177,14 +177,16 @@ export class SunChart {
     if (sunrise && sunset) {
       return {
         startY: timeToY(sunrise, height),
-        endY: timeToY(sunset, height)
+        endY: timeToY(sunset, height),
+        hasBoundary: true
       };
     }
 
     if (getSunCondition(date, latitude, longitude) === 'always-up') {
       return {
         startY: 0,
-        endY: height
+        endY: height,
+        hasBoundary: false
       };
     }
 
@@ -277,6 +279,53 @@ export class SunChart {
     }
 
     this.drawDaylightSegment(daylightSegment);
+    this.drawBoundaryPath(sunrisePoints);
+    this.drawBoundaryPath(sunsetPoints);
+  }
+
+  /**
+   * Draw the filled daylight area between sunrise and sunset curves.
+   * Polar day is daylight for the full 24-hour column; polar night is left unfilled.
+   */
+  drawDaylightArea(dates, latitude, longitude, width, height) {
+    const pxPerDay = width / (dates.length - 1);
+    const intervals = dates.map((date) => this.getDaylightInterval(date, latitude, longitude, height));
+    const sunrisePoints = [];
+    const sunsetPoints = [];
+
+    for (let i = 0; i < intervals.length; i++) {
+      const interval = intervals[i];
+      const x = i * pxPerDay;
+
+      if (interval?.hasBoundary) {
+        sunrisePoints.push({ x, y: interval.startY });
+        sunsetPoints.push({ x, y: interval.endY });
+      } else {
+        sunrisePoints.push(null);
+        sunsetPoints.push(null);
+      }
+
+      if (i === 0) continue;
+
+      const previous = intervals[i - 1];
+      if (!previous || !interval) continue;
+
+      const previousX = (i - 1) * pxPerDay;
+      const pathData = [
+        `M ${previousX} ${previous.startY}`,
+        `L ${x} ${interval.startY}`,
+        `L ${x} ${interval.endY}`,
+        `L ${previousX} ${previous.endY}`,
+        'Z'
+      ].join(' ');
+
+      this.svg.appendChild(createSvgElement('path', {
+        d: pathData,
+        fill: COLORS.dayFill,
+        'fill-opacity': 0.5
+      }));
+    }
+
     this.drawBoundaryPath(sunrisePoints);
     this.drawBoundaryPath(sunsetPoints);
   }
