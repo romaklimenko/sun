@@ -2,7 +2,7 @@
  * SVG Chart rendering module for sunrise/sunset visualization
  */
 
-import { getSunrise, getSunset, getDayOfYear } from './sun-calc.js';
+import { getSunrise, getSunset, getDayOfYear, getSunCondition } from './sun-calc.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -89,8 +89,9 @@ export class SunChart {
     }));
 
     // Draw components
-    this.drawGrid(width, height);
     this.drawDaylightArea(dates, latitude, longitude, width, height);
+    this.drawGrid(width, height);
+    this.drawMonthGrid(dates, width, height);
     this.drawCurrentPosition(now, latitude, longitude, width, height, dates.length);
 
     // Clear and append
@@ -99,7 +100,7 @@ export class SunChart {
   }
 
   /**
-   * Draw the hour and month grid lines
+   * Draw the hour grid lines
    */
   drawGrid(width, height) {
     const pxPerHour = height / 24;
@@ -136,28 +137,15 @@ export class SunChart {
   }
 
   /**
-   * Draw the filled daylight area between sunrise and sunset curves
+   * Draw month grid lines and labels independent of sunrise/sunset availability.
    */
-  drawDaylightArea(dates, latitude, longitude, width, height) {
+  drawMonthGrid(dates, width, height) {
     const pxPerDay = width / (dates.length - 1);
-    let pathData = '';
 
-    // Build sunrise path (left to right)
     for (let i = 0; i < dates.length; i++) {
       const date = dates[i];
-      const sunrise = getSunrise(date, latitude, longitude);
-      if (!sunrise) continue;
-
       const x = i * pxPerDay;
-      const y = timeToY(sunrise, height);
 
-      if (i === 0 || pathData === '') {
-        pathData = `M ${x} ${y}`;
-      } else {
-        pathData += ` L ${x} ${y}`;
-      }
-
-      // Draw month separators and labels
       if (i !== 0 && date.getDate() === 1) {
         this.svg.appendChild(createSvgElement('line', {
           x1: x, y1: 0, x2: x, y2: height,
@@ -177,29 +165,107 @@ export class SunChart {
         this.svg.appendChild(monthText);
       }
     }
+  }
 
-    // Build sunset path (right to left)
-    for (let i = dates.length - 1; i >= 0; i--) {
-      const date = dates[i];
-      const sunset = getSunset(date, latitude, longitude);
-      if (!sunset) continue;
+  /**
+   * Return the daylight interval for one date as Y coordinates.
+   */
+  getDaylightInterval(date, latitude, longitude, height) {
+    const sunrise = getSunrise(date, latitude, longitude);
+    const sunset = getSunset(date, latitude, longitude);
 
-      const x = i * pxPerDay;
-      const y = timeToY(sunset, height);
-      pathData += ` L ${x} ${y}`;
+    if (sunrise && sunset) {
+      return {
+        startY: timeToY(sunrise, height),
+        endY: timeToY(sunset, height),
+        hasBoundary: true
+      };
     }
 
-    // Close the path
-    pathData += ' Z';
+    if (getSunCondition(date, latitude, longitude) === 'always-up') {
+      return {
+        startY: 0,
+        endY: height,
+        hasBoundary: false
+      };
+    }
 
-    // Draw filled area
+    return null;
+  }
+
+  /**
+   * Draw a continuous boundary line through normal sunrise or sunset points.
+   */
+  drawBoundaryPath(points) {
+    let pathData = '';
+
+    for (const point of points) {
+      if (!point) {
+        if (pathData) this.appendBoundaryPath(pathData);
+        pathData = '';
+        continue;
+      }
+
+      pathData += pathData ? ` L ${point.x} ${point.y}` : `M ${point.x} ${point.y}`;
+    }
+
+    if (pathData) this.appendBoundaryPath(pathData);
+  }
+
+  appendBoundaryPath(pathData) {
     this.svg.appendChild(createSvgElement('path', {
       d: pathData,
-      fill: COLORS.dayFill,
-      'fill-opacity': 0.5,
+      fill: 'none',
       stroke: COLORS.dayCurve,
       'stroke-width': 1
     }));
+  }
+
+  /**
+   * Draw the filled daylight area between sunrise and sunset curves.
+   * Polar day is daylight for the full 24-hour column; polar night is left unfilled.
+   */
+  drawDaylightArea(dates, latitude, longitude, width, height) {
+    const pxPerDay = width / (dates.length - 1);
+    const intervals = dates.map((date) => this.getDaylightInterval(date, latitude, longitude, height));
+    const sunrisePoints = [];
+    const sunsetPoints = [];
+
+    for (let i = 0; i < intervals.length; i++) {
+      const interval = intervals[i];
+      const x = i * pxPerDay;
+
+      if (interval?.hasBoundary) {
+        sunrisePoints.push({ x, y: interval.startY });
+        sunsetPoints.push({ x, y: interval.endY });
+      } else {
+        sunrisePoints.push(null);
+        sunsetPoints.push(null);
+      }
+
+      if (i === 0) continue;
+
+      const previous = intervals[i - 1];
+      if (!previous || !interval) continue;
+
+      const previousX = (i - 1) * pxPerDay;
+      const pathData = [
+        `M ${previousX} ${previous.startY}`,
+        `L ${x} ${interval.startY}`,
+        `L ${x} ${interval.endY}`,
+        `L ${previousX} ${previous.endY}`,
+        'Z'
+      ].join(' ');
+
+      this.svg.appendChild(createSvgElement('path', {
+        d: pathData,
+        fill: COLORS.dayFill,
+        'fill-opacity': 0.5
+      }));
+    }
+
+    this.drawBoundaryPath(sunrisePoints);
+    this.drawBoundaryPath(sunsetPoints);
   }
 
   /**
