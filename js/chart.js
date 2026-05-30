@@ -6,16 +6,16 @@ import { getSunrise, getSunset, getDayOfYear, getSunCondition } from './sun-calc
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-// Solarized colors
+// Material-inspired colors
 const COLORS = {
-  gridLine: '#93a1a1',
-  gridText: '#93a1a1',
-  chartBg: '#eee8d5',
-  dayFill: '#fdf6e3',
-  dayCurve: '#657b83',
-  currentLine: '#cb4b16',
-  currentDot: '#FFFF00',
-  currentDotStroke: '#cb4b16'
+  gridLine: '#CFD8DC',
+  gridText: '#607D8B',
+  chartBg: '#F4F7F9',
+  dayFill: '#FFE082',
+  dayCurve: '#00695C',
+  currentLine: '#FF7043',
+  currentDot: '#FFD54F',
+  currentDotStroke: '#F4511E'
 };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -178,38 +178,82 @@ export class SunChart {
       return {
         startY: timeToY(sunrise, height),
         endY: timeToY(sunset, height),
-        hasBoundary: true
+        hasBoundary: true,
+        condition: 'normal'
       };
     }
 
-    if (getSunCondition(date, latitude, longitude) === 'always-up') {
+    const condition = getSunCondition(date, latitude, longitude);
+    if (condition === 'always-up') {
       return {
         startY: 0,
         endY: height,
-        hasBoundary: false
+        hasBoundary: false,
+        condition
       };
     }
 
-    return null;
+    return {
+      startY: null,
+      endY: null,
+      hasBoundary: false,
+      condition
+    };
+  }
+
+  /**
+   * A normal daylight interval can wrap across midnight near polar day.
+   */
+  getDaylightBands(interval, height) {
+    if (!interval || interval.condition === 'always-down') return [];
+    if (interval.condition === 'always-up') return [{ startY: 0, endY: height }];
+    if (interval.startY <= interval.endY) return [{ startY: interval.startY, endY: interval.endY }];
+
+    return [
+      { startY: 0, endY: interval.endY },
+      { startY: interval.startY, endY: height }
+    ];
   }
 
   /**
    * Draw a continuous boundary line through normal sunrise or sunset points.
+   *
+   * At high latitudes the first/last rise or set around polar day can cross
+   * midnight, which makes the y coordinate jump from the top edge to the
+   * bottom edge. Split those paths at the chart edge instead of drawing a
+   * false vertical/diagonal stroke through the daylight area.
    */
-  drawBoundaryPath(points) {
+  drawBoundaryPath(points, height) {
     let pathData = '';
+    let previous = null;
+
+    const flushPath = () => {
+      if (pathData) this.appendBoundaryPath(pathData);
+      pathData = '';
+    };
 
     for (const point of points) {
       if (!point) {
-        if (pathData) this.appendBoundaryPath(pathData);
-        pathData = '';
+        flushPath();
+        previous = null;
         continue;
       }
 
-      pathData += pathData ? ` L ${point.x} ${point.y}` : `M ${point.x} ${point.y}`;
+      if (previous && Math.abs(point.y - previous.y) > height / 2) {
+        const previousEdge = previous.y < point.y ? 0 : height;
+        const nextEdge = previous.y < point.y ? height : 0;
+
+        pathData += ` L ${previous.x} ${previousEdge}`;
+        flushPath();
+        pathData = `M ${point.x} ${nextEdge} L ${point.x} ${point.y}`;
+      } else {
+        pathData += pathData ? ` L ${point.x} ${point.y}` : `M ${point.x} ${point.y}`;
+      }
+
+      previous = point;
     }
 
-    if (pathData) this.appendBoundaryPath(pathData);
+    flushPath();
   }
 
   appendBoundaryPath(pathData) {
@@ -232,55 +276,52 @@ export class SunChart {
   }
 
   /**
-   * Draw one filled daylight region for a contiguous run of daylight intervals.
+   * Draw one filled daylight quadrilateral between two adjacent dates.
    */
-  drawDaylightSegment(points) {
-    if (!points.length) return;
+  drawDaylightQuad(previousX, previousBand, x, band) {
+    const pathData = [
+      `M ${previousX} ${previousBand.startY}`,
+      `L ${x} ${band.startY}`,
+      `L ${x} ${band.endY}`,
+      `L ${previousX} ${previousBand.endY}`,
+      'Z'
+    ].join(' ');
 
-    const topEdge = points.map((point, index) => {
-      const command = index === 0 ? 'M' : 'L';
-      return `${command} ${point.x} ${point.startY}`;
-    });
-    const bottomEdge = points
-      .slice()
-      .reverse()
-      .map((point) => `L ${point.x} ${point.endY}`);
-
-    this.appendDaylightPath([...topEdge, ...bottomEdge, 'Z'].join(' '));
+    this.appendDaylightPath(pathData);
   }
 
   /**
-   * Draw the filled daylight area between sunrise and sunset curves.
-   * Polar day is daylight for the full 24-hour column; polar night is left unfilled.
+   * Draw adjacent daylight bands that overlap vertically. Wrapped-midnight days
+   * have top and bottom bands; matching by overlap keeps those bands separate
+   * instead of drawing false connectors across the night gap.
    */
-  drawDaylightArea(dates, latitude, longitude, width, height) {
-    const pxPerDay = width / (dates.length - 1);
-    const intervals = dates.map((date) => this.getDaylightInterval(date, latitude, longitude, height));
-    const sunrisePoints = [];
-    const sunsetPoints = [];
-    let daylightSegment = [];
+  drawDaylightBetweenDays(previousX, previousBands, x, bands) {
+    for (const previousBand of previousBands) {
+      for (const band of bands) {
+        const overlap = Math.min(previousBand.endY, band.endY) - Math.max(previousBand.startY, band.startY);
+        if (overlap <= 0) continue;
 
+        this.drawDaylightQuad(previousX, previousBand, x, band);
+      }
+    }
+  }
+
+  /**
+   * Draw a tiny cusp where the normal sunrise and sunset curves enter or
+   * leave polar night. This avoids a visible break at the first/last short day.
+   */
+  drawPolarNightCusps(intervals, pxPerDay) {
     for (let i = 0; i < intervals.length; i++) {
       const interval = intervals[i];
-      const x = i * pxPerDay;
+      if (!interval?.hasBoundary || interval.startY > interval.endY) continue;
 
-      if (!interval) {
-        this.drawDaylightSegment(daylightSegment);
-        daylightSegment = [];
-        sunrisePoints.push(null);
-        sunsetPoints.push(null);
-        continue;
-      }
+      const previous = intervals[i - 1];
+      const next = intervals[i + 1];
+      const touchesPolarNight = previous?.condition === 'always-down' || next?.condition === 'always-down';
+      if (!touchesPolarNight) continue;
 
-      const point = { x, startY: interval.startY, endY: interval.endY };
-      daylightSegment.push(point);
-      sunrisePoints.push({ x, y: interval.startY });
-      sunsetPoints.push({ x, y: interval.endY });
+      this.appendBoundaryPath(`M ${i * pxPerDay} ${interval.startY} L ${i * pxPerDay} ${interval.endY}`);
     }
-
-    this.drawDaylightSegment(daylightSegment);
-    this.drawBoundaryPath(sunrisePoints);
-    this.drawBoundaryPath(sunsetPoints);
   }
 
   /**
@@ -290,8 +331,13 @@ export class SunChart {
   drawDaylightArea(dates, latitude, longitude, width, height) {
     const pxPerDay = width / (dates.length - 1);
     const intervals = dates.map((date) => this.getDaylightInterval(date, latitude, longitude, height));
+    const bandsByDay = intervals.map((interval) => this.getDaylightBands(interval, height));
     const sunrisePoints = [];
     const sunsetPoints = [];
+
+    for (let i = 1; i < intervals.length; i++) {
+      this.drawDaylightBetweenDays((i - 1) * pxPerDay, bandsByDay[i - 1], i * pxPerDay, bandsByDay[i]);
+    }
 
     for (let i = 0; i < intervals.length; i++) {
       const interval = intervals[i];
@@ -304,30 +350,11 @@ export class SunChart {
         sunrisePoints.push(null);
         sunsetPoints.push(null);
       }
-
-      if (i === 0) continue;
-
-      const previous = intervals[i - 1];
-      if (!previous || !interval) continue;
-
-      const previousX = (i - 1) * pxPerDay;
-      const pathData = [
-        `M ${previousX} ${previous.startY}`,
-        `L ${x} ${interval.startY}`,
-        `L ${x} ${interval.endY}`,
-        `L ${previousX} ${previous.endY}`,
-        'Z'
-      ].join(' ');
-
-      this.svg.appendChild(createSvgElement('path', {
-        d: pathData,
-        fill: COLORS.dayFill,
-        'fill-opacity': 0.5
-      }));
     }
 
-    this.drawBoundaryPath(sunrisePoints);
-    this.drawBoundaryPath(sunsetPoints);
+    this.drawBoundaryPath(sunrisePoints, height);
+    this.drawBoundaryPath(sunsetPoints, height);
+    this.drawPolarNightCusps(intervals, pxPerDay);
   }
 
   /**
