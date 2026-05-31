@@ -6,14 +6,14 @@ import { getSunrise, getSunset, getDayOfYear, getSunCondition } from './sun-calc
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-// Material-inspired colors
+// Material-inspired colors. Night is the dark background; daylight is painted on top.
 const COLORS = {
-  gridLine: '#CFD8DC',
-  gridText: '#607D8B',
-  chartBg: '#F4F7F9',
-  dayFill: '#FFE082',
-  dayCurve: '#00695C',
-  currentLine: '#FF7043',
+  gridLine: 'rgba(255, 255, 255, 0.08)',
+  gridText: '#90A4AE',     // Blue Grey 300
+  nightBg: '#263238',      // Blue Grey 900 — the night sky
+  dayFill: '#FFE082',      // Amber 200 — daylight
+  dayCurve: '#FFB300',     // Amber 600 — horizon line
+  currentLine: '#FF7043',  // Deep Orange 400
   currentDot: '#FFD54F',
   currentDotStroke: '#F4511E'
 };
@@ -82,10 +82,10 @@ export class SunChart {
       preserveAspectRatio: 'none'
     });
 
-    // Background
+    // Background (night)
     this.svg.appendChild(createSvgElement('rect', {
       x: 0, y: 0, width, height,
-      fill: COLORS.chartBg
+      fill: COLORS.nightBg
     }));
 
     // Draw components
@@ -216,16 +216,15 @@ export class SunChart {
   }
 
   /**
-   * Draw a continuous boundary line through normal sunrise or sunset points.
+   * Draw a continuous boundary line through sunrise or sunset points.
    *
-   * At high latitudes the first/last rise or set around polar day can cross
-   * midnight, which makes the y coordinate jump from the top edge to the
-   * bottom edge. Split those paths at the chart edge instead of drawing a
-   * false vertical/diagonal stroke through the daylight area.
+   * A null entry marks a discontinuity (polar day/night, or a transition day
+   * whose interval wraps across midnight). The path is split there so the line
+   * simply ends at the edge of the daylight region — the dark night fill closes
+   * the shape — instead of drawing a false spike to the chart edge.
    */
-  drawBoundaryPath(points, height) {
+  drawBoundaryPath(points) {
     let pathData = '';
-    let previous = null;
 
     const flushPath = () => {
       if (pathData) this.appendBoundaryPath(pathData);
@@ -235,22 +234,9 @@ export class SunChart {
     for (const point of points) {
       if (!point) {
         flushPath();
-        previous = null;
         continue;
       }
-
-      if (previous && Math.abs(point.y - previous.y) > height / 2) {
-        const previousEdge = previous.y < point.y ? 0 : height;
-        const nextEdge = previous.y < point.y ? height : 0;
-
-        pathData += ` L ${previous.x} ${previousEdge}`;
-        flushPath();
-        pathData = `M ${point.x} ${nextEdge} L ${point.x} ${point.y}`;
-      } else {
-        pathData += pathData ? ` L ${point.x} ${point.y}` : `M ${point.x} ${point.y}`;
-      }
-
-      previous = point;
+      pathData += pathData ? ` L ${point.x} ${point.y}` : `M ${point.x} ${point.y}`;
     }
 
     flushPath();
@@ -271,7 +257,9 @@ export class SunChart {
     this.svg.appendChild(createSvgElement('path', {
       d: pathData,
       fill: COLORS.dayFill,
-      'fill-opacity': 0.5
+      'fill-opacity': 0.92,
+      stroke: COLORS.dayFill,
+      'stroke-width': 0.5
     }));
   }
 
@@ -307,24 +295,6 @@ export class SunChart {
   }
 
   /**
-   * Draw a tiny cusp where the normal sunrise and sunset curves enter or
-   * leave polar night. This avoids a visible break at the first/last short day.
-   */
-  drawPolarNightCusps(intervals, pxPerDay) {
-    for (let i = 0; i < intervals.length; i++) {
-      const interval = intervals[i];
-      if (!interval?.hasBoundary || interval.startY > interval.endY) continue;
-
-      const previous = intervals[i - 1];
-      const next = intervals[i + 1];
-      const touchesPolarNight = previous?.condition === 'always-down' || next?.condition === 'always-down';
-      if (!touchesPolarNight) continue;
-
-      this.appendBoundaryPath(`M ${i * pxPerDay} ${interval.startY} L ${i * pxPerDay} ${interval.endY}`);
-    }
-  }
-
-  /**
    * Draw the filled daylight area between sunrise and sunset curves.
    * Polar day is daylight for the full 24-hour column; polar night is left unfilled.
    */
@@ -343,7 +313,10 @@ export class SunChart {
       const interval = intervals[i];
       const x = i * pxPerDay;
 
-      if (interval?.hasBoundary) {
+      // Only stroke normal days. A wrapped interval (sunrise after sunset)
+      // happens on the single transition day next to polar day; treating it as
+      // a break keeps the curve smooth and lets the night fill close the shape.
+      if (interval?.hasBoundary && interval.startY <= interval.endY) {
         sunrisePoints.push({ x, y: interval.startY });
         sunsetPoints.push({ x, y: interval.endY });
       } else {
@@ -352,9 +325,8 @@ export class SunChart {
       }
     }
 
-    this.drawBoundaryPath(sunrisePoints, height);
-    this.drawBoundaryPath(sunsetPoints, height);
-    this.drawPolarNightCusps(intervals, pxPerDay);
+    this.drawBoundaryPath(sunrisePoints);
+    this.drawBoundaryPath(sunsetPoints);
   }
 
   /**
