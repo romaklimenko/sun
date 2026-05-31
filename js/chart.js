@@ -9,8 +9,8 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 // Material-inspired colors. Night is the dark background; daylight is painted on top.
 const COLORS = {
   gridLine: 'rgba(255, 255, 255, 0.08)',
-  gridText: '#90A4AE',     // Blue Grey 300
-  nightBg: '#263238',      // Blue Grey 900 — the night sky
+  gridText: '#9FA8DA',     // Indigo 200
+  nightBg: '#0D1B4D',      // Cobalt-like dark blue night sky
   dayFill: '#FFE082',      // Amber 200 — daylight
   dayCurve: '#FFB300',     // Amber 600 — horizon line
   currentLine: '#FF7043',  // Deep Orange 400

@@ -1,20 +1,21 @@
 /* Material-inspired color palette */
 :root {
-  --background: #263238;
-  --background-deep: #1b2429;
-  --surface: #37474f;
-  --surface-elevated: #455a64;
-  --surface-muted: #546e7a;
-  --on-surface: #eceff1;
-  --on-surface-muted: #b0bec5;
-  --chart-bg: #263238;
+  --background: #0d1b4d;
+  --background-deep: #081236;
+  --surface: #1a237e;
+  --surface-elevated: #283593;
+  --surface-muted: #5c6bc0;
+  --on-surface: #e8eaf6;
+  --on-surface-muted: #9fa8da;
+  --chart-bg: #0d1b4d;
+  --backdrop: rgba(8, 18, 54, 0.72);
   --primary: #26a69a;
   --primary-dark: #00897b;
   --secondary: #ffca28;
   --accent: #ff7043;
   --danger: #ef5350;
   --success: #66bb6a;
-  --outline: rgba(176, 190, 197, 0.28);
+  --outline: rgba(159, 168, 218, 0.32);
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
 }
 
@@ -26,7 +27,7 @@
 
 html, body {
   height: 100%;
-  background: linear-gradient(135deg, var(--background-deep), var(--background));
+  background-color: var(--background);
   color: var(--surface-muted);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-size: 14px;
@@ -53,7 +54,7 @@ header {
   padding: 12px 16px;
   text-align: center;
   color: var(--on-surface);
-  background: linear-gradient(180deg, var(--surface), var(--background));
+  background-color: var(--surface);
   font-weight: 600;
 }
 
@@ -91,7 +92,7 @@ header {
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  background-color: rgba(27, 36, 41, 0.72);
+  background-color: var(--backdrop);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -107,7 +108,7 @@ header {
 }
 
 .dialog {
-  background: linear-gradient(180deg, var(--surface-elevated), var(--surface));
+  background-color: var(--surface-elevated);
   border: 1px solid var(--outline);
   border-radius: 16px;
   padding: 24px;
